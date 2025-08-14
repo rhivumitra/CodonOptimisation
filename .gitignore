@@ -20,3 +20,6 @@ hyena_checkpoints/
 # Other
 *.ipynb_checkpoints/
 
+
+hyena_checkpoints/
+*.safetensors
