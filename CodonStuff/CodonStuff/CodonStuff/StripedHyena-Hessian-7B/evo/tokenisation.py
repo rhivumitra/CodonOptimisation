@@ -773,12 +773,24 @@ class Tokenizer:
         """
         aa_encoding = self.tokenise_aa_seqs(aa_seqs)
         aa_encoding = [torch.tensor(seq, dtype=torch.long) for seq in aa_encoding]
-        aa_encoding = pad_sequence(aa_encoding, batch_first=True, padding_value=self.pad_token_id).to(device)
+        aa_encoding = pad_sequence(
+            aa_encoding,
+            batch_first=True,
+            padding_value=self.pad_token_id,
+        ).to(device)
+
+        # Append a <SEP> token so inputs are [<START>, aa…, <SEP>] prior to generation
+        sep_tokens = torch.full(
+            (aa_encoding.size(0), 1),
+            self.sep_token_id,
+            dtype=torch.long,
+            device=device,
+        )
+        aa_encoding = torch.cat([aa_encoding, sep_tokens], dim=1)
 
         n_batches = ceil(len(aa_encoding) / batch_size)
         nt_translations = []
 
-        start_token = self.start_token_id
         end_token   = self.end_token_id
         pad_token   = self.pad_token_id
 
@@ -789,19 +801,20 @@ class Tokenizer:
         transformer.eval()
         with torch.no_grad():
             for i in range(n_batches):
-                batch_aa_encoding = aa_encoding[i*batch_size:(i+1)*batch_size]
-                batch_size_curr   = batch_aa_encoding.size(0)
+                aa_with_sep = aa_encoding[i * batch_size : (i + 1) * batch_size]
+                batch_size_curr = aa_with_sep.size(0)
 
-                # start each with a <START> codon token
-                generated = torch.full((batch_size_curr, 1), start_token,
-                                    dtype=torch.long, device=device)
+                # start with an empty generated sequence
+                generated = torch.empty(
+                    batch_size_curr, 0, dtype=torch.long, device=device
+                )
 
                 # mask tracking which sequences have hit <END>
                 done = torch.zeros(batch_size_curr, dtype=torch.bool, device=device)
 
                 for _ in range(max_seq_length):
                     # build the full input and mask
-                    input_ids = torch.cat([batch_aa_encoding, generated], dim=1)
+                    input_ids = torch.cat([aa_with_sep, generated], dim=1)
                     attention_mask = (input_ids != pad_token)
 
                     # forward pass through provided transformer-like callable
@@ -839,8 +852,8 @@ class Tokenizer:
                     if done.all():
                         break
 
-                # strip off the initial <START> and convert to numpy
-                generated_np = generated[:, 1:].cpu().numpy()
+                # convert generated tokens to numpy
+                generated_np = generated.cpu().numpy()
 
                 if return_string:
                     batch_translations = self._detokenise_nt_seqs(generated_np)
