@@ -23,3 +23,13 @@ hyena_checkpoints/
 
 hyena_checkpoints/
 *.safetensors
+
+# large/binary artifacts
+*.safetensors
+hyena_checkpoints/
+*.pt
+*.pickle
+*.out
+*.err
+work/
+**/tmp_flash_attn_build/
