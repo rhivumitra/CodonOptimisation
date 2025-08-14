@@ -1,0 +1,11 @@
+tokenizers 
+pandas
+levenshtein
+PyYAML
+scikit-learn
+tqdm
+transformers
+
+### flashfftconv: uncomment both for use_flash_depthwise or use_flashfft
+#git+https://github.com/HazyResearch/flash-fft-conv.git#subdirectory=csrc/flashfftconv
+#git+https://github.com/HazyResearch/flash-fft-conv.git
