@@ -57,65 +57,74 @@ def codon_list_levenshtein(a, b):
     return dp[m][n]
 
 # ---------------------------
-# Collate (now accepts pad token id)
+# Collate (pads + builds mask)
 # ---------------------------
 def hyena_collate_fn(batch, pad_token_id=0):
     """
-    batch: list of tuples (input_ids, attention_mask, labels)
-    pad_token_id: token id used for padding in input_ids/attention_mask
+    batch: list of tuples (input_ids_1D, labels_1D)
+    Returns: input_ids[B, L], attention_mask[B, L], labels[B, L]
     """
-    input_ids, attention_masks, labels = zip(*batch)
+    input_seqs, label_seqs = zip(*batch)  # exactly two items per sample
 
-    # DEBUG
-    #print("→ about to pad batch of", len(input_ids), "examples")
-    #for i, ids in enumerate(input_ids):
-        #print(f"   sample {i}: ids.shape = {ids.shape}   mask.shape = {attention_masks[i].shape}   labels.shape = {labels[i].shape}")
+    input_tensors = [torch.as_tensor(x, dtype=torch.long) for x in input_seqs]
+    label_tensors = [torch.as_tensor(y, dtype=torch.long) for y in label_seqs]
 
-    # Use pad_token_id for input_ids padding, 0 for attention mask padding, -100 for labels padding
-    input_ids = pad_sequence(input_ids, batch_first=True, padding_value=pad_token_id)
-    attention_masks = pad_sequence(attention_masks, batch_first=True, padding_value=0)
-    labels = pad_sequence(labels, batch_first=True, padding_value=-100)  # -100 ignored by loss
+    input_ids = pad_sequence(input_tensors, batch_first=True, padding_value=pad_token_id)
+    labels    = pad_sequence(label_tensors, batch_first=True, padding_value=-100)
 
-    return input_ids, attention_masks, labels
+    attention_mask = (input_ids != pad_token_id).long()  # 1=keep, 0=pad
+    return input_ids, attention_mask, labels
+
 
 # ---------------------------
-# Dataset + DataLoader
+# Dataset
 # ---------------------------
 class HyenaSeq2SeqDataset(torch.utils.data.Dataset):
     def __init__(self, aa_nt_df, tokenizer, max_seq_length=2048, device='cuda'):
         self.aa_nt_df = aa_nt_df
         self.tokenizer = tokenizer
         self.max_seq_length = max_seq_length
-        self.device = device
+        self.device = device  # not used inside dataset; move-to-device in training loop
 
     def __len__(self):
         return len(self.aa_nt_df)
 
     def __getitem__(self, idx):
-        input_ids, attention_mask, labels = self.tokenizer.format_dataset_torch(
-            self.aa_nt_df.iloc[[idx]],  # keeps it as a dataframe for `.to_numpy()`
-            max_seq_length=self.max_seq_length,
-            device=self.device
-        )
-        # Ensure labels in vocab
-        assert (labels[labels != -100] < config.vocab_size).all(), "⚠️ Label out of vocab range"
-        input_ids = input_ids.squeeze(0)  # remove batch dimension
-        attention_mask = attention_mask.squeeze(0)  # remove batch dimension
-        labels = labels.squeeze(0)  # remove batch dimension
+        # Build a SINGLE sample (1D lists), no padding, no mask
+        aa = self.aa_nt_df.iloc[idx, 0]
+        nt = self.aa_nt_df.iloc[idx, 1]
 
-        # Assert all are 1D
-        assert input_ids.ndim == 1, f"input_ids has shape {input_ids.shape}, expected 1D"
-        assert attention_mask.ndim == 1, f"attention_mask has shape {attention_mask.shape}, expected 1D"
-        assert labels.ndim == 1, f"labels has shape {labels.shape}, expected 1D"
+        # Make the concatenated token sequence: <START> AAs <SEP> NTs <END>
+        # and the label sequence: -100 for <= SEP, codon ids after
+        tokens_2d = self.tokenizer.tokenise_aa_nt_pair([aa], [nt])  # returns shape (1, L) torch.LongTensor
+        token_ids = tokens_2d[0].tolist()  # 1D list
 
-        return input_ids, attention_mask, labels
+        # Build labels aligned to token_ids
+        if self.tokenizer.sep_token_id not in token_ids:
+            # malformed pair; you can raise or skip. Here we raise to surface data issues.
+            raise ValueError("No <SEP> in tokenized pair")
 
+        sep_idx = token_ids.index(self.tokenizer.sep_token_id)
+        labels = [(-100 if i <= sep_idx else tid) for i, tid in enumerate(token_ids)]
+
+        # (Optional) sanity: labels within vocab except masked
+        # Use tokenizer.vocab_size (not a global config)
+        if hasattr(self.tokenizer, "vocab_size"):
+            for t in labels:
+                if t != -100 and not (0 <= t < self.tokenizer.vocab_size):
+                    raise ValueError(f"Label out of range: {t}")
+
+        # Return ONLY (input_ids_1D, labels_1D); collate will pad & make mask
+        return token_ids, labels
+
+
+# ---------------------------
+# DataLoader wrapper
+# ---------------------------
 class HyenaDataLoader:
-    def __init__(self, csv_path, tokenizer, max_seq_length=2048, batch_size=32, device='cuda', train_size=0.8, val_size=0.1, test_size=0.1):
-        """
-        Builds train, val, test DataLoaders from a CSV file using StripedHyena-compatible dataset structure.
-        """
-        assert train_size + val_size + test_size == 1.0, "Train/val/test splits must sum to 1."
+    def __init__(self, csv_path, tokenizer, max_seq_length=2048, batch_size=32,
+                 device='cuda', train_size=0.8, val_size=0.1, test_size=0.1):
+        assert abs(train_size + val_size + test_size - 1.0) < 1e-9, "Splits must sum to 1."
 
         self.csv_path = csv_path
         self.tokenizer = tokenizer
@@ -129,27 +138,23 @@ class HyenaDataLoader:
         self._prepare_datasets()
 
     def _prepare_datasets(self):
-        # Load full CSV
         df = pd.read_csv(self.csv_path, header=None)
         df.columns = ['aa_seq', 'nt_seq']
 
-        # First split into train and temp
         train_df, temp_df = train_test_split(df, test_size=(1.0 - self.train_size), random_state=42)
-
-        # Then split temp into validation and test
         val_split = self.val_size / (self.val_size + self.test_size)
         val_df, test_df = train_test_split(temp_df, test_size=(1.0 - val_split), random_state=42)
 
-        # Save datasets
         self.train_dataset = HyenaSeq2SeqDataset(train_df, self.tokenizer, self.max_seq_length, self.device)
-        self.val_dataset = HyenaSeq2SeqDataset(val_df, self.tokenizer, self.max_seq_length, self.device)
-        self.test_dataset = HyenaSeq2SeqDataset(test_df, self.tokenizer, self.max_seq_length, self.device)
+        self.val_dataset   = HyenaSeq2SeqDataset(val_df,   self.tokenizer, self.max_seq_length, self.device)
+        self.test_dataset  = HyenaSeq2SeqDataset(test_df,  self.tokenizer, self.max_seq_length, self.device)
 
     def get_loaders(self):
-        # Attach tokenizer.pad_token_id to collate via a small lambda closure
-        train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, collate_fn=lambda b: hyena_collate_fn(b, pad_token_id=self.tokenizer.pad_token_id))
-        val_loader = DataLoader(self.val_dataset, batch_size=self.batch_size, shuffle=False, collate_fn=lambda b: hyena_collate_fn(b, pad_token_id=self.tokenizer.pad_token_id))
-        test_loader = DataLoader(self.test_dataset, batch_size=self.batch_size, shuffle=False, collate_fn=lambda b: hyena_collate_fn(b, pad_token_id=self.tokenizer.pad_token_id))
+        pad_id = self.tokenizer.pad_token_id
+        collate = lambda b: hyena_collate_fn(b, pad_token_id=pad_id)
+        train_loader = DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True,  collate_fn=collate)
+        val_loader   = DataLoader(self.val_dataset,   batch_size=self.batch_size, shuffle=False, collate_fn=collate)
+        test_loader  = DataLoader(self.test_dataset,  batch_size=self.batch_size, shuffle=False, collate_fn=collate)
         return train_loader, val_loader, test_loader
 
 # ---------------------------
@@ -162,11 +167,15 @@ class StripedHyenaCausalLossWrapper(nn.Module):
     - causal (shifted) cross-entropy loss with ignore_index (-100)
     - HF-like return object: outputs.loss and outputs.logits (SimpleNamespace)
     """
-    def __init__(self, base_model, pad_token_id, ignore_index=-100):
+    def __init__(self, base_model, pad_token_id, ignore_index=-100, label_smoothing=0.1):
         super().__init__()
         self.base_model = base_model
         self.pad_token_id = pad_token_id
         self.ignore_index = ignore_index
+        self.loss_fn = nn.CrossEntropyLoss(
+            ignore_index=self.ignore_index,
+            label_smoothing=label_smoothing
+        )
 
     def forward(self, input_ids, attention_mask=None, labels=None, inference_params_dict=None):
         # Build attention_mask if not provided: 1 for non-pad, 0 for pad
@@ -186,14 +195,13 @@ class StripedHyenaCausalLossWrapper(nn.Module):
             # Shift logits and labels for causal LM loss (predict token t from tokens <= t-1)
             shift_logits = logits[:, :-1, :].contiguous()
             shift_labels = labels[:, 1:].contiguous()
-            loss = F.cross_entropy(
+            loss = self.loss_fn(
                 shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1),
-                ignore_index=self.ignore_index
+                shift_labels.view(-1)
             )
-            return SimpleNamespace(loss=loss, logits=logits)
+            return SimpleNamespace(loss=loss, logits=logits, inference_out=inference_out)
         else:
-            return SimpleNamespace(logits=logits)
+            return SimpleNamespace(logits=logits, inference_out=inference_out)
 
 # ---------------------------
 # Training / Evaluation functions (updated to use wrapper)
@@ -278,7 +286,7 @@ def evaluate(model, loss_wrapper, dataloader, tokenizer, device):
         # Use the wrapper for generation (it accepts attention_mask)
         pred_nts = tokenizer.translate_aa_into_nt_torch(
             loss_wrapper, aa_seqs, max_seq_length=2048,
-            return_string=True, batch_size=32, device=device, temperature=0.8
+            return_string=True, batch_size=32, device=device, temperature=0.5
         )
 
         # compute codon-level metrics

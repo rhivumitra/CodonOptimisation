@@ -13,55 +13,6 @@ import numpy as np
 # import keras_nlp
 class Tokenizer:
     def __init__(self):
-        # # Amino acid tokenization parameters
-        # self.ALL_AAS = 'ACDEFGHIKLMNPQRSTVWY*'
-        # self.ADDITIONAL_TOKENS = ['<PAD>', '<START>', '<END>','<SEP>', '<UNK>']
-        # self.ADDED_TOKENS_PER_SEQ = 2
-        # self.eod_id = 2  # End-of-document token ID
-        # self.eos_id = 2  # End-of-sequence token ID
-
-        # # Create amino acid token mappings
-        # self.n_aas = len(self.ALL_AAS)
-        # self.n_add_aa_tokens = len(self.ADDITIONAL_TOKENS)
-        # self.aa_token_to_index = {
-        #     aa: i + self.n_add_aa_tokens for i, aa in enumerate(self.ALL_AAS)
-        # }
-        # self.additional_aa_token_to_index = {
-        #     token: i for i, token in enumerate(self.ADDITIONAL_TOKENS)
-        # }
-        # self.global_aa_token_to_index = {
-        #     **self.additional_aa_token_to_index, **self.aa_token_to_index
-        # }
-        # self.index_to_aa_token = {
-        #     index: token for token, index in self.global_aa_token_to_index.items()
-        # }
-        # self.N_AA_TOKENS = len(self.global_aa_token_to_index)
-
-        # # Nucleotide/codon tokenization parameters
-        # self.ALL_CODONS = [
-        #     nt1 + nt2 + nt3 for nt1 in "ATCG" for nt2 in "ATCG" for nt3 in "ATCG"
-        # ]
-        # self.ADDITIONAL_NT_TOKENS = ['<PAD>', '<START>', '<END>','<SEP>', '<UNK>']
-
-
-        # # Create codon token mappings
-        # self.n_codons = len(self.ALL_CODONS)
-        # self.n_additional_tokens = len(self.ADDITIONAL_NT_TOKENS)
-        # self.CODON_OFFSET = 26
-        # self.codon_token_to_index = {
-        #     codon: i + self.CODON_OFFSET for i, codon in enumerate(self.ALL_CODONS)
-        #     #codon: i + self.n_additional_tokens for i, codon in enumerate(self.ALL_CODONS)
-        # }
-        # self.additional_codon_token_to_index = {
-        #     token: i for i, token in enumerate(self.ADDITIONAL_NT_TOKENS)
-        # }
-        # self.global_codon_token_to_index = {
-        #     **self.additional_codon_token_to_index, **self.codon_token_to_index
-        # }
-        # self.index_to_codon_token = {
-        #     index: token for token, index in self.global_codon_token_to_index.items()
-        # }
-        # self.N_CODON_TOKENS = len(self.global_codon_token_to_index)
 
         # Load unified vocab
         vocab_path = "/home/rm15weti/CodonStuff/CodonStuff/CodonStuff/StripedHyena-Hessian-7B/evo/tokenizer/full_biotokenizer.json"
@@ -69,7 +20,7 @@ class Tokenizer:
             self.token_to_index = json.load(f)
 
         self.index_to_token = {v: k for k, v in self.token_to_index.items()}
-        self.vocab_size = len(self.token_to_index)
+        self.vocab_size = max(self.token_to_index.values()) + 1
 
         # Special token IDs (if needed explicitly)
         self.pad_token = "<PAD>"
@@ -94,55 +45,6 @@ class Tokenizer:
         self.special_tokens = [tok for tok in [self.pad_token, self.start_token, self.end_token, self.sep_token, self.unk_token] if tok in self.token_to_index]      
 
 
-
-
-        # Tokenisation must be performed for the "language" of amino acids as 
-        # well as for the "language" of nucleotides
-        # For both languages, tokenisation is performed via mapping of the
-        # individual tokens to integer indices
-
-        # Start with the preparation of amino acid tokenisation
-
-        # The enumeration of amino acids below does not contain selenocysteine
-        # (U) and the letter X, denoting any amino acid / an unknown amino acid
-        # This is due to the fact that the coding sequences were downloaded from
-        # NCBI, not the protein sequences, and nucleotide sequences containing
-        # ambiguous characters (such as N for any nucleotide) were excluded
-        # Hence, the amino acid character X does not occur
-        # Moreover, the default table from NCBI was used for translation, i. e.
-        # the amino acid selenocysteine does not occur in the protein sequences
-        # However, the asterisk is included, as it denotes a stop codon
-        # ALL_AAS = 'ACDEFGHIKLMNPQRSTVWY*'
-        # Compared to the tokenisation implemented in ProteinBERT, the '<OTHER>'
-        # token is omitted as an entirely unambiguous alphabet is employed for
-        # both the nucleotide sequences and the amino acid sequennces
-        # The padding token is usually mapped to the integer zero, which is why
-        # this is done here as well
-        # The consequences of mapping the padding token to another integer or
-        # whether this has any consequences at all is not known
-        #ADDITIONAL_TOKENS = ['<PAD>', '<START>', '<END>']
-
-        # To each sequence, one <START> and <END> token is added, respectively
-        #ADDED_TOKENS_PER_SEQ = 2
-
-    # @property
-    # def eod(self):
-    #     return self.eod_id
-
-    # # duplicate to suppose both names, eos and eod
-    # @property
-    # def eos(self):
-    #     return self.eod_id
-
-    # @property
-    # def vocab_size(self):
-    #     """
-    #     This property returns the size of the vocabulary, i. e. the number of
-    #     unique tokens in the amino acid "language" plus the number of
-    #     additional tokens, such as <START>, <END>, etc.
-    #     """
-    #     return len(self.N_AA_TOKENS) + len(self.ADDITIONAL_TOKENS)
-    
     def parse_seq(self, seq):
         """
         This function is responsible for converting an input sequence to a
@@ -190,12 +92,6 @@ class Tokenizer:
         tokenised_seq: list, dtype=int
             The tokenised analogue of the input amino acid sequence.
         """
-        # It is important to prepend the <START> token and append <END>
-        # token to the sequence
-        # tokens = [
-        #     self.aa_token_to_index.get(aa)
-        #     for aa in self.parse_seq(seq)
-        # ]
         tokens = [
             self.token_to_index.get(aa)
             for aa in self.parse_seq(seq)
@@ -241,12 +137,6 @@ class Tokenizer:
                     break
             tokenised_seqs_list.append(self.tokenise_aa_seq(seq))
 
-        # Now, compute the largest length of the tokenised sequences
-        # comprised in the batch
-        # Computing the largest length of the tokenised (integer) sequences
-        # instead of the plain string sequences is necessary as in the
-        # course of tokenisation, the length of each sequence is incremented
-        # by two due to the addition of the <START> and <END> token
         max_length = max(map(len, tokenised_seqs_list))
 
         # Perform padding for each of the tokenised sequences
@@ -261,23 +151,6 @@ class Tokenizer:
         #return tokenised_seqs_array
         return tokenised_seqs_list
 
-
-    # Now, prepare nucleotide/codon tokenisation
-    # As it is exclusively dealt with DNA sequences, and not RNA sequences,
-    # uracil is omitted
-    # The letter N, denoting any nucleotide, is not included as sequences
-    # containing ambiguous nucleotides were discarded in advance in order to
-    # permit an unambiguous translation into amino acids
-    # Note that in the case of nucleotide sequences, tokenisation is not
-    # performed for the individual characters/nucleotides as with the amino
-    # acids, but rather for individual codons, i. e. triplets
-
-    # As with the amino acid tokenisation, the '<OTHER>' token is omitted as
-    # an entirely unambiguous alphabet is used for the nucleotide
-    # tokenisation and sequences containing ambiguous characters have been
-    # discarded
-    # Again, the padding token is deliberately mapped to the integer zero as
-    # the consequences of deviating from this convention are not known
 
     @property
     def vocab_size_NT(self):
@@ -338,12 +211,6 @@ class Tokenizer:
         tokenised_seq: list, dtype=int
             The tokenised analogue of the input nucleotide sequence.
         """
-        # It is important to prepend the <START> token and append the <END>
-        # token to the sequence
-        # tokens = [
-        #     self.codon_token_to_index.get(codon)
-        #     for codon in self._split_into_triplets(self.parse_seq(seq))
-        # ]
         tokens = [
             self.token_to_index.get(codon)
             for codon in self._split_into_triplets(self.parse_seq(seq))
@@ -400,10 +267,6 @@ class Tokenizer:
 
         for seq in seqs:
             tokenised_seqs_list.append(self._tokenise_nt_seq(seq))
-
-        # Perform padding for each of the tokenised sequences
-        # Determine the largest sequence length in the batch and increment
-        # it by 1
         max_length = max(map(len, tokenised_seqs_list))
         max_length += 1
 
@@ -464,12 +327,6 @@ class Tokenizer:
             amount of input sequences, whereas the second dimension, n,
             corresponds to the maximum sequence length.
         """
-        # First, check for a valid argument passed to 'max_seq_len'
-        # Keep in mind that the parameter 'max_seq_len' refers to the
-        # maximum sequence length in terms of codons, not in terms of single
-        # nucleotides
-        # Hence, in order to perform the comparison, the length of the
-        # largest input nucleotide sequence must be divided by three
         max_input_length = max(map(len, seqs)) / 3
         if max_seq_len < max_input_length:
             raise ValueError(
@@ -495,20 +352,6 @@ class Tokenizer:
 
         return tokenised_seqs_array
 
-    ##########################
-    ## ADDED BY RHIVU
-    ##########################
-
-    # def tokenise_aa_nt_pair(self, aa_seqs, nt_seqs):
-    #     aa_tokens = self.tokenise_aa_seqs(aa_seqs)
-    #     nt_tokens = self._tokenise_nt_seqs(nt_seqs
-    #     )
-
-    #     BOS = self.additional_aa_token_to_index["<START>"]
-    #     SEP = self.additional_aa_token_to_index["<SEP>"]
-    #     EOS = self.additional_aa_token_to_index["<END>"]
-
-    #     return aa_tokens + [SEP] + nt_tokens
 
     def tokenise_aa_nt_pair(self, aa_seqs, nt_seqs):
         """
@@ -529,7 +372,8 @@ class Tokenizer:
         #print(f"AA tokens: {aa_tokens}")
         nt_tokens = self._tokenise_nt_seqs(nt_seqs)    # shape: (B, L_nt)
         #print(f"NT tokens: {nt_tokens}")
-
+        START = self.start_token_id
+        END = self.end_token_id
         SEP = self.sep_token_id 
         batch_size = len(aa_seqs)
 
@@ -540,25 +384,27 @@ class Tokenizer:
             nt_seq = nt_tokens[i]
 
             combined = np.concatenate([
+                np.array([START], dtype=np.int32),
                 aa_seq, 
                 np.array([SEP], dtype=np.int32), 
-                nt_seq
+                nt_seq,
+                np.array([END], dtype=np.int32)
             ])
             combined_tokens.append(combined)
-            #print(f"Combined tokens for sequence {i}: {combined}")
 
-        # Pad to max length in batch
-        # max_len = max(len(seq) for seq in combined_tokens)
-        # PAD_ID = self.pad_token_id
-
-        # padded_tokens = np.array([
-        #     np.pad(seq, (0, max_len - len(seq)), constant_values=PAD_ID)
-        #     for seq in combined_tokens
-        # ], dtype=np.int32)
-        #print(f"Padded tokens: {padded_tokens}")
-
-        # return torch.tensor(padded_tokens, dtype=torch.long)
-        return torch.tensor(combined_tokens, dtype=torch.long)
+        # Efficient conversion: if all same length, stack; if single sample, unsqueeze; else fallback
+        try:
+            lengths = {len(x) for x in combined_tokens}
+            if len(lengths) == 1:
+                import numpy as _np
+                return torch.from_numpy(_np.stack(combined_tokens)).long()
+            elif len(combined_tokens) == 1:
+                import numpy as _np
+                return torch.from_numpy(_np.expand_dims(combined_tokens[0], 0)).long()
+            else:
+                return torch.tensor(combined_tokens, dtype=torch.long)  # ragged fallback (may warn)
+        except Exception:
+            return torch.tensor(combined_tokens, dtype=torch.long)
 
     def _detokenise_nt_seqs_torch(self, nt_token_tensor):
         """
@@ -625,233 +471,157 @@ class Tokenizer:
 
         return sequences
 
+    def format_dataset_torch(self, aa_nt_pairs, max_seq_length=None, device='cpu'):
+        """
+        Build *unpadded* input_id sequences and label sequences for AA<SEP>NT training.
+        Padding and attention_mask will be created later in collate_fn.
 
-    #########################
-    ## ADDED BY RHIVU
-    #########################
-    ## BELOW IS THE FUNCTION FOR PYTORCH
-    def format_dataset_torch(self, aa_nt_pairs, max_seq_length, device='cuda'):
-        #print(f"Formatting dataset with max_seq_length={max_seq_length} on device={device}")
+        Returns:
+            input_id_list: List[List[int]]
+            label_list:    List[List[int]]  (with -100 on AA+SEP positions)
+        """
+        # Convert DF -> arrays of strings
         aa_nt_pairs = aa_nt_pairs.to_numpy()
         aa_seqs, nt_seqs = zip(*aa_nt_pairs)
 
         input_id_list = []
         label_list = []
-        pad_id = self.pad_token_id  
 
         for aa, nt in zip(aa_seqs, nt_seqs):
-            #print(f"Processing sequence: {aa} -> {nt}")
-            # Tokenise amino acid and nucleotide sequences
-            token_ids = self.tokenise_aa_nt_pair([aa], [nt])
-            #print(f"Token IDs: {token_ids}")
-            token_ids = token_ids.flatten().tolist()
-            #print(f"Flattened Token IDs: {token_ids}, with length {len(token_ids)}")
+            # Tokenise and concatenate: <START> AA ... <SEP> NT ... <END>
+            toks = self.tokenise_aa_nt_pair([aa], [nt])  # Tensor [1, L] or ragged fallback
+            toks = toks.flatten().tolist()
 
-            if self.sep_token_id not in token_ids:
-                #print("No <SEP> token found in sequence, skipping.")
-                continue  # malformed sequence
+            # Sanity: require <SEP>
+            if self.sep_token_id not in toks:
+                continue
 
-            sep_idx = token_ids.index(self.sep_token_id)
-            #print(f"SEP token found at index: {sep_idx}")
+            # (Optional) truncate if a hard cap is desired (keeps sequence valid)
+            if max_seq_length is not None and len(toks) > max_seq_length:
+                # Keep tail so we don't drop <END>; simple strategy — you can tailor this
+                toks = toks[:max_seq_length]
 
-            labels = []
-            for i, tid in enumerate(token_ids):
-                if i <= sep_idx:
-                    labels.append(-100)  # Mask AA + SEP
-                else:
-                    labels.append(tid)   # Predict codons
-            
-            input_id_list.append(token_ids)
+            sep_idx = toks.index(self.sep_token_id)
+
+            # Labels: ignore AA + <SEP>, learn on codon positions
+            labels = [(-100 if i <= sep_idx else tok) for i, tok in enumerate(toks)]
+
+            input_id_list.append(toks)
             label_list.append(labels)
 
-            # # Pad or truncate
-            # if len(token_ids) > max_seq_length:
-            #     token_ids = token_ids[:max_seq_length]
-            #     labels = labels[:max_seq_length]
-            # else:
-            #     token_ids += [pad_id] * (max_seq_length - len(token_ids))
-            #     labels += [-100] * (max_seq_length - len(labels))
-
-            # # ⚠️ Skip if all labels are -100
-            # if all(l == -100 for l in labels):
-            #     continue
-            
-
-
-            assert len(input_id_list) == len(label_list), "Input and label lists must be of the same length."
-            #print(f"input id list: {input_id_list}")
-            #print(f"label list: {label_list}")
-
         if len(input_id_list) == 0:
-            # make sure this is a list-of-list, not a flat list!
-            input_id_list = [ input_id_list[0] ]    # already a list, so this is [[...]]
-            label_list    = [ label_list[0] ]
+            raise ValueError("No valid AA<SEP>NT samples were produced (missing <SEP> or empty input).")
 
-        input_ids = torch.tensor(input_id_list, dtype=torch.long, device=device)
-        labels = torch.tensor(label_list, dtype=torch.long, device=device)
-        attention_mask = (input_ids != pad_id).long()
-
-        #print("→ [format_dataset_torch] input_ids.shape :", input_ids.shape)
-        #print("→ [format_dataset_torch] attention_mask.shape :", attention_mask.shape)
-        #print("→ [format_dataset_torch] labels.shape :", labels.shape)
+        # NOTE: do NOT make tensors or move to device here. Let collate_fn handle padding and device.
+        return input_id_list, label_list
 
 
-        return input_ids, attention_mask, labels
-
-    # def translate_aa_into_nt_torch(self, transformer, aa_seqs, max_seq_length, 
-    #                                 return_string=True, batch_size=32, device='cpu'):
-    #     """
-    #     Translate amino acid sequences to nucleotide sequences using a PyTorch transformer.
-    #     """
-    #     aa_encoding = self.tokenise_aa_seqs(aa_seqs)
-    #     aa_encoding = [torch.tensor(seq, dtype=torch.long) for seq in aa_encoding]
-    #     aa_encoding = pad_sequence(aa_encoding, batch_first=True, padding_value=self.pad_token_id)
-    #     aa_encoding = aa_encoding.to(device)
-
-    #     n_batches = ceil(len(aa_encoding) / batch_size)
-
-    #     nt_translations = []
-
-    #     start_token = self.start_token_id
-    #     end_token = self.end_token_id
-    #     pad_token = self.pad_token_id
-
-    #     transformer.eval()
-    #     with torch.no_grad():
-    #         for i in range(n_batches):
-    #             batch_aa_encoding = aa_encoding[i*batch_size:(i+1)*batch_size]
-    #             batch_size_curr = batch_aa_encoding.size(0)
-
-    #             # Initial decoder input: <START>
-    #             generated = torch.full((batch_size_curr, 1), start_token, dtype=torch.long, device=device)
-
-    #             for _ in range(max_seq_length):
-    #                 # Concatenate AA input and generated NTs
-    #                 input_ids = torch.cat([batch_aa_encoding, generated], dim=1)
-
-    #                 # Padding mask: True where input is NOT pad
-    #                 attention_mask = (input_ids != pad_token)
-
-    #                 # Forward pass through model
-    #                 output = transformer(input_ids, attention_mask=attention_mask)
-    #                 output_logits = output.logits
-
-    #                 next_token_logits = output_logits[:, -1, :]  # get last token's logits
-    #                 next_tokens = torch.argmax(next_token_logits, dim=-1, keepdim=True)
-
-    #                 # # assert that we never predict an AA id (> 4 and ≤ vocab_start_of_codons)
-    #                 # aa_vocab_max = tokenizer.token_to_index['*']   # that’s 2 for <END>, but AA tokens start at 5
-    #                 # first_codon_id = aa_vocab_max + 1
-    #                 # # sanity‐check during decoding:
-    #                 # bad = (next_tokens < first_codon_id) & (next_tokens != start_token) & (next_tokens != end_token)
-    #                 # mask = next_tokens >= first_codon_id
-    #                 # assert mask.all(), "❌ Model predicted an AA or special token after <SEP>!"
-
-    #                 generated = torch.cat([generated, next_tokens], dim=1)
-
-    #                 if (next_tokens == end_token).all():
-    #                     break
-
-    #             # Remove <START> token and truncate at <END>
-    #             generated_np = generated[:, 1:].cpu().numpy()
-                
-    #             if return_string:
-    #                 batch_translations = self._detokenise_nt_seqs(generated_np)
-    #                 nt_translations.extend(batch_translations)
-    #             else:
-    #                 nt_translations.append(generated_np)
-
-    #     if not return_string:
-    #         nt_translations = np.vstack(nt_translations)
-
-    #     return np.array(nt_translations)
-    def translate_aa_into_nt_torch(self, transformer, aa_seqs, max_seq_length,
-                                    return_string=True, batch_size=32, device='cpu', temperature=1.0):
+    def translate_aa_into_nt_torch(
+        self,
+        transformer,
+        aa_seqs,
+        max_seq_length,
+        return_string=True,
+        batch_size=32,
+        device="cpu",
+        temperature=0.5,
+    ):
         """
-        Translate amino acid sequences to nucleotide sequences using a PyTorch transformer.
-        Restricted sampling: only codon token IDs are allowed when sampling.
+        Translate AA sequences -> NT codon sequences with a causal LM trained on:
+        <START> AAs <SEP> NTs <END>
+
+        Sampling is restricted to {codon tokens} ∪ {<END>}.
         """
-        aa_encoding = self.tokenise_aa_seqs(aa_seqs)
-        aa_encoding = [torch.tensor(seq, dtype=torch.long) for seq in aa_encoding]
-        aa_encoding = pad_sequence(aa_encoding, batch_first=True, padding_value=self.pad_token_id).to(device)
+        # Tokenize & pad AA side (no <START>/<SEP> injected here)
+        aa_ids = self.tokenise_aa_seqs(aa_seqs)
+        aa_ids = [torch.tensor(s, dtype=torch.long) for s in aa_ids]
+        aa_pad = pad_sequence(aa_ids, batch_first=True, padding_value=self.pad_token_id).to(device)
 
-        n_batches = ceil(len(aa_encoding) / batch_size)
-        nt_translations = []
+        n = aa_pad.size(0)
+        n_batches = (n + batch_size - 1) // batch_size
+        outputs = []
 
-        start_token = self.start_token_id
-        end_token   = self.end_token_id
-        pad_token   = self.pad_token_id
+        start_id = self.start_token_id
+        sep_id   = self.sep_token_id
+        end_id   = self.end_token_id
+        pad_id   = self.pad_token_id
 
-        # where AA/vocab ends and codon IDs begin
-        aa_vocab_max   = self.token_to_index['*']      # last AA or special
-        first_codon_id = aa_vocab_max + 1             # first codon token ID
+        # If codon IDs are contiguous and start after AA/specials:
+        aa_vocab_max   = self.token_to_index['*']      # last AA/special in your scheme
+        first_codon_id = aa_vocab_max + 1              # assumes contiguous codon block
 
         transformer.eval()
         with torch.no_grad():
-            for i in range(n_batches):
-                batch_aa_encoding = aa_encoding[i*batch_size:(i+1)*batch_size]
-                batch_size_curr   = batch_aa_encoding.size(0)
+            for bi in range(n_batches):
+                batch_aa = aa_pad[bi*batch_size : (bi+1)*batch_size]
+                B = batch_aa.size(0)
 
-                # start each with a <START> codon token
-                generated = torch.full((batch_size_curr, 1), start_token,
-                                    dtype=torch.long, device=device)
+                # Prefix: <START> AAs <SEP>
+                start = torch.full((B, 1), start_id, dtype=torch.long, device=device)
+                sep   = torch.full((B, 1), sep_id,   dtype=torch.long, device=device)
+                prefix = torch.cat([start, batch_aa, sep], dim=1)
 
-                # mask tracking which sequences have hit <END>
-                done = torch.zeros(batch_size_curr, dtype=torch.bool, device=device)
+                generated = torch.empty(B, 0, dtype=torch.long, device=device)
+                done = torch.zeros(B, dtype=torch.bool, device=device)
 
-                for _ in range(max_seq_length):
-                    # build the full input and mask
-                    input_ids = torch.cat([batch_aa_encoding, generated], dim=1)
-                    attention_mask = (input_ids != pad_token)
+                # Precompute allowed-vocab mask once per batch
+                # Try to read vocab size from the model; fall back to tokenizer if needed
+                try:
+                    vocab_size = transformer.base_model.unembed.weight.size(0)
+                except AttributeError:
+                    vocab_size = len(self.index_to_token)
 
-                    # forward pass through provided transformer-like callable
-                    output = transformer(input_ids, attention_mask=attention_mask)
-                    # wrapper returns SimpleNamespace-like object with .logits
-                    output_logits = output.logits  # (B, L, V)
-                    next_token_logits = output_logits[:, -1, :].clone()  # (B, V)
+                allowed = torch.zeros(vocab_size, dtype=torch.bool, device=device)
+                allowed[first_codon_id:] = True   # codons (contiguous assumption)
+                allowed[end_id] = True            # allow END as well
 
-                    # ---- Restrict sampling to codon token ids only ----
-                    # disallow prediction of any token <= aa_vocab_max (i.e. AA tokens / specials)
-                    if first_codon_id > 0:
-                        next_token_logits[:, :first_codon_id] = -1e9
+                # Reasonable cap: AA length (padded) + 1 for END, bounded by max_seq_length
+                cap = min(max_seq_length, int(batch_aa.size(1)) + 2)
 
-                    # If any sequence is already done, force it to predict END token only
-                    if done.any():
-                        # set all logits to -inf for done rows, except end_token
-                        mask_done = done.nonzero(as_tuple=True)[0]
-                        if mask_done.numel() > 0:
-                            next_token_logits[mask_done, :] = -1e9
-                            next_token_logits[mask_done, end_token] = 0.0  # keep end_token highest
+                for _ in range(cap):
+                    input_ids = torch.cat([prefix, generated], dim=1)
 
-                    # sampling with temperature
-                    scores = next_token_logits / max(1e-8, temperature)
-                    probs = torch.softmax(scores, dim=-1)
-                    next_tokens = torch.multinomial(probs, num_samples=1)  # (B,1)
+                    # mask: 1.0 keep, 0.0 pad (float/bf16 to match model math)
+                    attn = (input_ids != pad_id).to(
+                        dtype=transformer.base_model.embedding_layer.weight.dtype,
+                        device=input_ids.device
+                    )
 
-                    # update done mask
-                    next_tokens_flat = next_tokens.squeeze(1)
-                    done = done | (next_tokens_flat == end_token)
+                    out = transformer(input_ids, attention_mask=attn)
+                    logits = out.logits[:, -1, :]  # (B, V)
 
-                    # append new tokens
+                    # Restrict to codons + END
+                    masked = logits.clone()
+                    masked[:, ~allowed] = -1e9
+
+                    if temperature <= 0:
+                        next_tokens = masked.argmax(dim=-1, keepdim=True)
+                    else:
+                        probs = torch.softmax(masked / max(1e-8, temperature), dim=-1)
+                        next_tokens = torch.multinomial(probs, num_samples=1)
+
+                    next_flat = next_tokens.squeeze(1)
                     generated = torch.cat([generated, next_tokens], dim=1)
 
-                    # break if all finished
+                    # mark finished
+                    just_finished = (next_flat == end_id) & (~done)
+                    done |= just_finished
                     if done.all():
                         break
 
-                # strip off the initial <START> and convert to numpy
-                generated_np = generated[:, 1:].cpu().numpy()
-
+                # Convert this batch back to strings
+                gen_np = generated.cpu().numpy()  # NOTE: no [:,1:] here
                 if return_string:
-                    batch_translations = self._detokenise_nt_seqs(generated_np)
-                    nt_translations.extend(batch_translations)
+                    batch_nt = self._detokenise_nt_seqs(gen_np)
+                    outputs.extend(batch_nt)
                 else:
-                    nt_translations.append(generated_np)
+                    outputs.append(gen_np)
 
         if not return_string:
-            nt_translations = np.vstack(nt_translations)
+            outputs = np.vstack(outputs)
 
-        return np.array(nt_translations)
+        return np.array(outputs)
+
 
 
     def _detokenise_nt_seqs(self, nt_token_array):
@@ -938,206 +708,3 @@ class Tokenizer:
 
         return distances
 
-    ##############################
-    ## ADDED BY RHIVU
-    ##############################
-    # def generate_biotokenizer_aa_json(self, output_file="biotokenizer_aa.json"):
-    #     """
-    #     This function generates a biotokenizer JSON file for amino acid vocabulary.
-    #     It creates a mapping of ALL_AAS and ADDITIONAL_TOKENS to their unique indices.
-
-    #     Parameters
-    #     ----------
-    #     output_file: str
-    #         The name of the JSON file to save the vocabulary mapping.
-    #     """
-    #     # Combine ALL_AAS and ADDITIONAL_TOKENS into a single vocabulary
-    #     vocab = self.ADDITIONAL_TOKENS + list(self.ALL_AAS)
-
-    #     # Create a mapping of tokens to unique indices
-    #     vocab_mapping = {token: idx for idx, token in enumerate(vocab)}
-
-    #     # Save the mapping as a JSON file
-    #     with open(output_file, "w") as f:
-    #         json.dump(vocab_mapping, f, indent=4)
-
-    #     print(f"Biotokenizer JSON file saved to {output_file}")
-
-    # ##############################
-    # ## ADDED BY RHIVU   
-    # ##############################
-
-    # def generate_biotokenizer_codon_json(self, output_file="biotokenizer_codon.json"):
-    #     """
-    #     This function generates a biotokenizer JSON file for codon vocabulary.
-    #     It creates a mapping of ALL_CODONS and ADDITIONAL_NT_TOKENS to their unique indices.
-
-    #     Parameters
-    #     ----------
-    #     output_file: str
-    #         The name of the JSON file to save the vocabulary mapping.
-    #     """
-    #     # Combine ALL_CODONS and ADDITIONAL_NT_TOKENS into a single vocabulary
-    #     vocab = self.ADDITIONAL_NT_TOKENS + self.ALL_CODONS
-
-    #     # Create a mapping of tokens to unique indices
-    #     vocab_mapping = {token: idx for idx, token in enumerate(vocab)}
-
-    #     # Save the mapping as a JSON file
-    #     with open(output_file, "w") as f:
-    #         json.dump(vocab_mapping, f, indent=4)
-
-    #     print(f"Biotokenizer JSON file saved to {output_file}")
-
-    '''
-    def translate_aa_into_nt(
-        transformer, aa_seqs, max_seq_length, return_string=True, batch_size=32
-    ):
-        """
-        This function translates from the "language" of amino acids into one
-        specific "dialect" of the nucleotide sequence "language". The term
-        "dialect" denotes the codon usage bias of one specific organism,
-        e. g. E. coli or S. cerevisiae. In order to accomplish this task,
-        the function accepts as input a transformer neural network which was
-        trained to translate amino acid sequences into nucleotide sequences
-        of one specific organism.
-
-        For this purpose, it employs the private functions `_encode_aa_seqs`
-        as well as `_detokenise_nt_seqs`.
-
-        In order to circumvent an OOM error in case of very large test data
-        sets, the test data set is manually batched into batches of a
-        user-defined size; the default value is 32.
-
-        Parameters
-        ----------
-        transformer: Keras model
-            A transformer neural network implemented in Keras and performing
-            the translation of amino acid sequences into nucleotide
-            sequences according to the codon usage bias of one specific
-            organism.
-        aa_seqs: list
-            A list comprising the amino acid sequences to be translated into
-            nucleotide sequences in accordance with the codon usage bias of
-            the respective organism.
-        max_seq_length: int
-            An integer denoting the maximum sequence length after which to
-            stop translation in case that the <END> token is not produced.
-        return_string: boolean, optional
-            A boolean indicating whether the translations are supposed to be
-            returned as contiguous strings (i. e. one string for each input
-            amino acid sequence) or as integer tokens. Defaults to 'True'.
-        batch_size: int
-            An integer defining the batch size. The segmentation of the data
-            set into batches of a defined size happens in order to avoid an
-            OOM error.
-
-        Returns
-        -------
-        nt_translations: NumPy array, dtype=str or NumPy array, dtype=int
-            Depending on the argument of the optional parameter
-            'return_string', two different outputs can be returned. If the
-            optional parameter is set to 'True', a one-dimensional NumPy
-            array is returned harbouring the sequences generated during
-            translation as strings. In other words, it contains the
-            generated sequences as human-readable nucleotide sequences. Its
-            length equals the amount of amino acid sequences passed as
-            input, i. e. the length of `aa_seqs`. However, if the optional
-            parameter is set to 'False', a two-dimensional NumPy array is
-            returned harbouring the sequences generated during translation
-            as integer tokens. Each row of this two-dimensional array
-            corresponds to one translation.
-        """
-        # Tokenise the input amino acid sequences
-        aa_encoding = tokenise_aa_seqs(aa_seqs)
-
-        # The manual batching of the tokenised amino acid sequences is
-        # performed
-        # To this end, the total amount of batches having the size defined
-        # by the user is determined
-        n_batches = ceil(len(aa_encoding) / batch_size)
-
-        # As stated in the documentation string, the output depends on the
-        # value of the optional parameter 'return_string'
-        # Hence, depending on whether the parameter is set to 'True' or
-        # 'False', a different output array is created
-        if return_string:
-            nt_translations = np.array([], dtype=str)
-        else:
-            nt_translations = np.empty(
-                shape=(0, max_seq_length), dtype=np.int32
-            )
-
-        for i in range(n_batches):
-            start_index = i * batch_size
-            end_index = (i + 1) * batch_size
-
-            # Extract the batch currently dealt with
-            current_batch_aa_encoding = aa_encoding[start_index:end_index, :]
-
-            # Define a function that computes the token probabilities for the
-            # next position given the input sequence
-            # The transformer output has the shape (B, l, 68), where B denotes
-            # the batch size/amount of amino acid sequences entered as input,
-            # l denotes the maximum sequence length and 68 is the total amount
-            # of nucleotide tokens
-            # As only the probabilities of the next token to predict are wanted,
-            # "-1" is chosen in the second dimension during slicing
-            def token_probability_fn(decoder_input_tokens):
-                return transformer(
-                    # The keyword argument `training` is set to `False` as this
-                    # makes inference more efficient by only computing the last
-                    # the last prediction instead of the prediction for all
-                    # tokens
-                    # It is not necessary to distinguish between training and
-                    # inference as this function is exclusively used for
-                    # inference; hence, this keyword argument does not need to
-                    # be accessible to the user
-                    [current_batch_aa_encoding, decoder_input_tokens],
-                    training=False
-                )[:, -1, :]
-            
-            n_seqs = len(current_batch_aa_encoding)
-
-            # Initialise the translated nucleotide sequences with the "<START>"
-            # token
-            prompt = tf.fill(
-                (n_seqs, 1),
-                global_codon_token_to_index["<START>"]
-            )
-
-            # Strangely enough, it is stated in the Keras documentation that
-            # 'keras_nlp.utils.greedy_search' returns either a 1D int Tensor
-            # or a 2D int RaggedTensor, whereby a ragged tensor is a
-            # non-rectangular tensor whose entries, i. e. rows have
-            # different sizes
-            # However, this is not true as the chosen padding token is added
-            # after encountering the end token until the maximum sequence
-            # length is reached
-            generated_tokens = keras_nlp.utils.greedy_search(
-                token_probability_fn,
-                prompt,
-                max_length=max_seq_length,
-                end_token_id=global_codon_token_to_index["<END>"]
-            )
-
-            if return_string:
-                current_batch_nt_translations = _detokenise_nt_seqs(generated_tokens)
-                nt_translations = np.append(nt_translations, current_batch_nt_translations)
-            else:
-                current_batch_nt_translations = generated_tokens.numpy()
-                # Verify that the array harbouring the translations is two-
-                # dimensional; an one-dimensional array is returned when the
-                # batch size is 1, which can occur under certain
-                # circumstances
-                if current_batch_nt_translations.ndim < 2:
-                    current_batch_nt_translations = np.expand_dims(
-                        current_batch_nt_translations, axis=0
-                    )
-                # Now, append the new translations to the output array
-                nt_translations = np.append(
-                    nt_translations, current_batch_nt_translations, axis=0
-                )
-
-        return nt_translations
-    '''
